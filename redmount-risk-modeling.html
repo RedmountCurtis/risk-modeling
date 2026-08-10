@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redmount Risk Modeling</title>
+<style>
+  :root{
+    --navy:#002347; --navy-2:#01315f; --cobalt:#2f6fed; --cobalt-dim:#5b8bf0;
+    --paper:#f6f7fa; --card:#ffffff; --line:#e2e6ee; --ink:#0e1a2b; --ink-dim:#5b6b82;
+    --good:#177350; --good-bg:#e7f5ee; --warn:#8a5a00; --warn-bg:#fff3de;
+    --bad:#9c2b2b; --bad-bg:#fbe9e9; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--paper); color:var(--ink);}
+  .shell{display:flex; min-height:100vh;}
+  .sidebar{width:250px; flex-shrink:0; background:var(--navy); color:#cfe0ff; padding:22px 18px; display:flex; flex-direction:column; gap:20px;}
+  .brand{font-size:15px; font-weight:700; color:#fff;}
+  .brand small{display:block; font-weight:400; color:#9fb8e6; font-size:11px; margin-top:2px;}
+  .client-list{display:flex; flex-direction:column; gap:2px; overflow-y:auto;}
+  .client-item{padding:9px 10px; border-radius:8px; cursor:pointer; font-size:13px; color:#b7c9e8; display:flex; justify-content:space-between; align-items:center;}
+  .client-item:hover{color:#fff;}
+  .client-item.active{background:var(--navy-2); color:#fff; font-weight:600;}
+  .client-item .gapdot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+  .side-foot{margin-top:auto; font-size:11px; color:#7d92b8; line-height:1.5;}
+  .tool-switcher-label{font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#7d92b8; font-weight:600; margin-bottom:6px;}
+  .tool-switcher{width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#fff; font-family:inherit; font-size:12.5px; padding:8px 9px; border-radius:6px;}
+  .tool-switcher option{color:#111;}
+  .nav-divider{height:1px; background:rgba(255,255,255,0.12); margin:4px 0;}
+  .main{flex:1; padding:32px 40px; max-width:1180px;}
+  h1{font-size:22px; margin:0 0 4px;}
+  .sub{color:var(--ink-dim); font-size:13.5px; margin:0 0 22px;}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px 24px; margin-bottom:22px;}
+  .panel h2{font-size:15px; margin:0 0 4px;}
+  .panel .desc{color:var(--ink-dim); font-size:12.5px; margin:0 0 16px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap;}
+  .field{display:flex; flex-direction:column; gap:5px; margin-bottom:14px; flex:1; min-width:150px;}
+  .field label{font-size:11px; font-weight:600; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.03em;}
+  input, select, textarea{border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:13.5px; font-family:inherit; background:#fff; color:var(--ink); width:100%;}
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--cobalt-dim); outline-offset:0; border-color:var(--cobalt);}
+  .btn{background:var(--cobalt); color:#fff; border:none; border-radius:7px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;}
+  .btn:hover{background:#2660d4;}
+  .btn.secondary{background:#fff; color:var(--navy); border:1px solid var(--line);}
+  .btn.secondary:hover{background:#f0f3f8;}
+  .btn.ghost{background:transparent; color:var(--ink-dim); border:1px solid var(--line); padding:6px 10px; font-size:12px;}
+  .btn.danger{background:transparent; color:var(--bad); border:1px solid #efc6c6; padding:6px 10px; font-size:12px;}
+  .tabs{display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--line);}
+  .tab{padding:10px 16px; font-size:13px; font-weight:600; color:var(--ink-dim); cursor:pointer; border-bottom:2px solid transparent;}
+  .tab.active{color:var(--cobalt); border-color:var(--cobalt);}
+  .subhead{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--navy); margin:20px 0 10px;}
+  .subhead:first-child{margin-top:0;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-dim); border-bottom:1px solid var(--line); padding:8px 10px; font-weight:600;}
+  td{padding:8px 10px; border-bottom:1px solid #eef1f6;}
+  tr:last-child td{border-bottom:none;}
+  .empty{border:1px dashed var(--line); border-radius:8px; padding:24px; text-align:center; color:var(--ink-dim); font-size:13px;}
+  .holding-row{display:grid; grid-template-columns:1.4fr 1fr auto; gap:8px; margin-bottom:6px; align-items:center;}
+  .gauge-wrap{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
+  .gauge{width:220px;}
+  .gauge .num{font-size:38px; font-weight:800; color:var(--navy);}
+  .gauge .lbl{font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-dim); font-weight:600;}
+  .bar-track{height:10px; background:#eef1f6; border-radius:99px; margin:8px 0; position:relative; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:99px; background:linear-gradient(90deg,#2f6fed,#7aa5f5);}
+  .gap-flag{display:inline-block; margin-top:10px; padding:5px 12px; border-radius:99px; font-size:12px; font-weight:700;}
+  .gap-flag.aligned{background:var(--good-bg); color:var(--good);}
+  .gap-flag.over{background:var(--bad-bg); color:var(--bad);}
+  .gap-flag.under{background:var(--warn-bg); color:var(--warn);}
+  .note{background:var(--warn-bg); border:1px solid #f0dcaa; color:#6b4a00; border-radius:8px; padding:12px 14px; font-size:12.5px; line-height:1.5; margin-bottom:18px;}
+  .note strong{color:#3d2c00;}
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;}
+  .account-card{border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px;}
+  .account-card .acct-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .account-card .acct-head input{font-weight:600; font-size:13.5px; border:none; padding:2px 0; max-width:260px;}
+  .empty-state-btn{margin-top:6px;}
+  footer.tool-foot{font-size:11.5px; color:var(--ink-dim); margin-top:6px; text-align:right;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">REDMOUNT<small>Risk Modeling</small></div>
+    <button class="btn" onclick="addClient()">+ New Client</button>
+    <div class="client-list" id="clientList"></div>
+    <div class="client-item" style="margin-top:6px; border-top:1px solid var(--navy-2); padding-top:14px;" onclick="openLibrary()">📊 Security Library</div>
+    <div class="side-foot">Data stays in this browser tab. Export clients before closing to save between sessions.</div>
+
+    <div class="nav-divider"></div>
+    <div class="tool-switcher-label">Switch Tool</div>
+    <select class="tool-switcher" id="toolSwitcher">
+      <option value="">— Redmount Tools —</option>
+      <option value="https://redmountcurtis.github.io/Redmount-Terminal/">Terminal (Home)</option>
+      <option value="https://redmountcurtis.github.io/401k/">Fiduciary Monitor</option>
+      <option value="https://redmountcurtis.github.io/capital-stack-navigator/">Capital Stack Navigator</option>
+      <option value="https://redmountcurtis.github.io/risk-modeling/" selected disabled>Risk Modeling (current)</option>
+    </select>
+  </aside>
+
+  <main class="main" id="mainArea">
+    <div class="empty" style="margin-top:60px;">Add a client to get started.</div>
+  </main>
+</div>
+
+<script>
+let clients = [];
+let activeId = null;
+let activeTab = 'profile';
+let currentView = 'clients'; // 'clients' | 'library'
+
+let securityLibrary = [
+  {ticker:'AAPL', name:'Apple Inc.', assetClass:'largecap', score:55},
+  {ticker:'MSFT', name:'Microsoft Corp.', assetClass:'largecap', score:50},
+  {ticker:'TSLA', name:'Tesla Inc.', assetClass:'largecap', score:92},
+  {ticker:'NVDA', name:'NVIDIA Corp.', assetClass:'largecap', score:85},
+  {ticker:'AMZN', name:'Amazon.com Inc.', assetClass:'largecap', score:65},
+  {ticker:'GOOGL', name:'Alphabet Inc.', assetClass:'largecap', score:58},
+  {ticker:'META', name:'Meta Platforms Inc.', assetClass:'largecap', score:68},
+  {ticker:'BRK.B', name:'Berkshire Hathaway B', assetClass:'largecap', score:42},
+  {ticker:'JNJ', name:'Johnson & Johnson', assetClass:'largecap', score:35},
+  {ticker:'KO', name:'Coca-Cola Co.', assetClass:'largecap', score:32},
+  {ticker:'SPY', name:'S&P 500 ETF', assetClass:'largecap', score:55},
+  {ticker:'VTI', name:'Total US Market ETF', assetClass:'largecap', score:57},
+  {ticker:'QQQ', name:'Nasdaq 100 ETF', assetClass:'largecap', score:66},
+  {ticker:'IWM', name:'Russell 2000 ETF', assetClass:'smidcap', score:78},
+  {ticker:'VXUS', name:'Intl ex-US ETF', assetClass:'intl', score:70},
+  {ticker:'VWO', name:'Emerging Markets ETF', assetClass:'em', score:85},
+  {ticker:'AGG', name:'Core US Bond ETF', assetClass:'corebond', score:22},
+  {ticker:'BND', name:'Total Bond Market ETF', assetClass:'corebond', score:20},
+  {ticker:'HYG', name:'High Yield Bond ETF', assetClass:'hybond', score:48},
+  {ticker:'TLT', name:'20+ Yr Treasury ETF', assetClass:'corebond', score:38},
+  {ticker:'SHY', name:'1-3 Yr Treasury ETF', assetClass:'stbond', score:8},
+  {ticker:'SGOV', name:'0-3 Mo Treasury ETF', assetClass:'cash', score:2},
+  {ticker:'GLD', name:'Gold Trust', assetClass:'alt', score:45},
+  {ticker:'VNQ', name:'US Real Estate ETF', assetClass:'alt', score:60},
+  {ticker:'BTC', name:'Bitcoin', assetClass:'lev', score:97},
+];
+
+function findSecurity(ticker){
+  if(!ticker) return null;
+  const t = ticker.trim().toUpperCase();
+  return securityLibrary.find(s=>s.ticker===t) || null;
+}
+
+function resolveHoldingScore(h){
+  const sec = findSecurity(h.ticker);
+  if(sec) return sec.score;
+  const cls = ASSET_CLASSES.find(a=>a.key===h.assetClass);
+  return cls ? cls.weight : null;
+}
+
+const ASSET_CLASSES = [
+  {key:'cash', label:'Cash / money market', weight:2},
+  {key:'stbond', label:'Short-term bonds', weight:15},
+  {key:'corebond', label:'Core / investment-grade bonds', weight:25},
+  {key:'hybond', label:'High-yield bonds', weight:45},
+  {key:'largecap', label:'Large-cap equity', weight:65},
+  {key:'smidcap', label:'Small/mid-cap equity', weight:80},
+  {key:'intl', label:'International developed equity', weight:75},
+  {key:'em', label:'Emerging markets equity', weight:90},
+  {key:'alt', label:'Alternatives / real estate', weight:55},
+  {key:'lev', label:'Leveraged / options / crypto', weight:95},
+];
+
+function uid(prefix){ return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
+
+function blankClient(){
+  return {
+    id: uid('c'),
+    reviewDate: '', meetingLength: '', agenda: '', personalChanges: '',
+    client1: {last:'', first:'', mi:'', status:'', employer:'', occupation:'', startDate:'', salary:''},
+    client2: {last:'', first:'', mi:'', status:'', employer:'', occupation:'', startDate:'', salary:''},
+    contact: {address:'', cityStateZip:'', phone:'', cell:'', email:''},
+    professionals: {cpa:'', attorney:'', other:''},
+    beneficiaries: [],
+    financial: {taxBracket:'', netWorth:'', liquidNetWorth:'', annualIncome:'', totalAssets:''},
+    riskTolerance:'', objective:'', horizon:'', liquidityImportance:'', drawingFromHoldings:'no',
+    otherIncome: [], issuesForDiscussion: [], recommendations:'', notes:'',
+    accounts: []
+  };
+}
+
+function addClient(){
+  const c = blankClient();
+  clients.push(c);
+  activeId = c.id;
+  activeTab = 'profile';
+  currentView = 'clients';
+  renderAll();
+}
+
+function getClient(id){ return clients.find(c=>c.id===id); }
+
+function removeClient(id){
+  clients = clients.filter(c=>c.id!==id);
+  if(activeId===id) activeId = clients.length ? clients[0].id : null;
+  renderAll();
+}
+
+// ---------- SCORING ----------
+function toleranceScore(c){
+  const map = {
+    riskTolerance: {'Conservative':10,'Moderately Conservative':30,'Moderate':50,'Moderately Aggressive':70,'Aggressive':90},
+    objective: {'Safety of Principal':10,'Tax Advantaged':30,'Income':40,'Growth':70,'Speculation':90},
+    horizon: {'Under 1 year':10,'1-3 years':25,'3-5 years':40,'5-10 years':60,'10-20 years':80,'20+ years':95},
+    liquidity: {'Very Important':20,'Somewhat Important':45,'Not Important':70}
+  };
+  const rt = map.riskTolerance[c.riskTolerance];
+  const ob = map.objective[c.objective];
+  const hz = map.horizon[c.horizon];
+  const lq = map.liquidity[c.liquidityImportance];
+  const parts = [
+    rt!==undefined ? {v:rt, w:0.40} : null,
+    ob!==undefined ? {v:ob, w:0.20} : null,
+    hz!==undefined ? {v:hz, w:0.25} : null,
+    lq!==undefined ? {v:lq, w:0.15} : null,
+  ].filter(Boolean);
+  if(parts.length===0) return null;
+  const totalW = parts.reduce((s,p)=>s+p.w,0);
+  const score = parts.reduce((s,p)=>s + p.v*(p.w/totalW), 0);
+  return Math.round(score);
+}
+
+function portfolioScore(c){
+  let totalValue = 0, weighted = 0;
+  c.accounts.forEach(acc=>{
+    acc.holdings.forEach(h=>{
+      const val = parseFloat(h.value) || 0;
+      const score = resolveHoldingScore(h);
+      if(val>0 && score!==null){ totalValue += val; weighted += val*score; }
+    });
+  });
+  if(totalValue===0) return null;
+  return Math.round(weighted/totalValue);
+}
+
+function portfolioValue(c){
+  let total = 0;
+  c.accounts.forEach(acc=> acc.holdings.forEach(h=> total += (parseFloat(h.value)||0)));
+  return total;
+}
+
+// ---------- RENDER ----------
+function renderAll(){
+  renderClientList();
+  renderMain();
+}
+
+function renderClientList(){
+  const wrap = document.getElementById('clientList');
+  if(clients.length===0){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = clients.map(c=>{
+    const name = (c.client1.first || c.client1.last) ? `${c.client1.first} ${c.client1.last}`.trim() : 'Unnamed client';
+    const ts = toleranceScore(c), ps = portfolioScore(c);
+    let dotColor = '#5b6b82';
+    if(ts!==null && ps!==null){
+      const gap = ps - ts;
+      dotColor = Math.abs(gap) <= 12 ? '#3ecf8e' : (gap > 12 ? '#e06767' : '#e0a83f');
+    }
+    return `<div class="client-item ${c.id===activeId?'active':''}" onclick="selectClient('${c.id}')">
+      <span>${name}</span><span class="gapdot" style="background:${dotColor}"></span>
+    </div>`;
+  }).join('');
+}
+
+function selectClient(id){ activeId = id; activeTab='profile'; currentView='clients'; renderAll(); }
+
+function openLibrary(){ currentView = 'library'; renderAll(); }
+
+function renderMain(){
+  const main = document.getElementById('mainArea');
+  if(currentView === 'library'){ main.innerHTML = libraryViewHTML(); return; }
+  if(!activeId){ main.innerHTML = '<div class="empty" style="margin-top:60px;">Add a client to get started.</div>'; return; }
+  const c = getClient(activeId);
+  if(!c){ main.innerHTML = '<div class="empty" style="margin-top:60px;">Add a client to get started.</div>'; return; }
+  const name = (c.client1.first || c.client1.last) ? `${c.client1.first} ${c.client1.last}`.trim() : 'Unnamed client';
+
+  main.innerHTML = `
+    <div class="toolbar">
+      <div>
+        <h1 style="margin-bottom:2px;">${name}</h1>
+        <p class="sub" style="margin:0;">Annual review, portfolio, and risk comparison</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" onclick="exportClients()">Export all (.json)</button>
+        <label class="btn secondary" style="cursor:pointer;">Import<input type="file" accept=".json" style="display:none;" onchange="importClients(event)"></label>
+        <button class="btn danger" onclick="removeClient('${c.id}')">Remove client</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab ${activeTab==='profile'?'active':''}" onclick="setTab('profile')">Client Profile</div>
+      <div class="tab ${activeTab==='accounts'?'active':''}" onclick="setTab('accounts')">Accounts &amp; Portfolio</div>
+      <div class="tab ${activeTab==='risk'?'active':''}" onclick="setTab('risk')">Risk Comparison</div>
+    </div>
+    <div id="tabContent"></div>
+    <footer class="tool-foot">Redmount Capital Partners — internal use</footer>
+  `;
+  renderTab();
+}
+
+function setTab(t){ activeTab=t; renderTab(); document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  document.querySelector(`.tab:nth-child(${t==='profile'?1:t==='accounts'?2:3})`).classList.add('active'); }
+
+function renderTab(){
+  const c = getClient(activeId);
+  const wrap = document.getElementById('tabContent');
+  if(activeTab==='profile') wrap.innerHTML = profileTabHTML(c);
+  else if(activeTab==='accounts') wrap.innerHTML = accountsTabHTML(c);
+  else wrap.innerHTML = riskTabHTML(c);
+}
+
+// ---------- PROFILE TAB ----------
+function personSection(c, key, label){
+  const p = c[key];
+  const fields = [
+    ['last','Last name','text'], ['first','First name','text'], ['mi','MI','text'],
+    ['status','Employment status','select:Employed,Self-employed,Unemployed,Student,Retired'],
+    ['employer','Employer','text'], ['occupation','Occupation','text'],
+    ['startDate','Employment start date','date'], ['salary','Annual salary','number']
+  ];
+  return `<div class="subhead">${label}</div><div class="row">
+    ${fields.map(([k,l,type])=>{
+      if(type.startsWith('select')){
+        const opts = type.split(':')[1].split(',');
+        return `<div class="field"><label>${l}</label><select onchange="update('${c.id}','${key}.${k}',this.value)">
+          <option value="">—</option>${opts.map(o=>`<option value="${o}" ${p[k]===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>`;
+      }
+      return `<div class="field"><label>${l}</label><input type="${type}" value="${p[k]||''}" onchange="update('${c.id}','${key}.${k}',this.value)"></div>`;
+    }).join('')}
+  </div>`;
+}
+
+function profileTabHTML(c){
+  return `
+  <div class="panel">
+    <h2>Meeting</h2>
+    <div class="row">
+      <div class="field"><label>Date of meeting</label><input type="date" value="${c.reviewDate}" onchange="update('${c.id}','reviewDate',this.value)"></div>
+      <div class="field"><label>Length of meeting</label><input type="text" value="${c.meetingLength}" onchange="update('${c.id}','meetingLength',this.value)"></div>
+    </div>
+    <div class="field"><label>Agenda</label><textarea rows="2" onchange="update('${c.id}','agenda',this.value)">${c.agenda}</textarea></div>
+    <div class="field"><label>Personal changes</label><textarea rows="2" onchange="update('${c.id}','personalChanges',this.value)">${c.personalChanges}</textarea></div>
+  </div>
+
+  <div class="panel">
+    <h2>Verification of Client(s)</h2>
+    ${personSection(c,'client1','Client 1')}
+    ${personSection(c,'client2','Client 2 (if applicable)')}
+    <div class="subhead">Contact (if different than on file)</div>
+    <div class="row">
+      <div class="field"><label>Home address</label><input type="text" value="${c.contact.address}" onchange="update('${c.id}','contact.address',this.value)"></div>
+      <div class="field"><label>City, state, ZIP</label><input type="text" value="${c.contact.cityStateZip}" onchange="update('${c.id}','contact.cityStateZip',this.value)"></div>
+      <div class="field"><label>Phone</label><input type="text" value="${c.contact.phone}" onchange="update('${c.id}','contact.phone',this.value)"></div>
+      <div class="field"><label>Cell</label><input type="text" value="${c.contact.cell}" onchange="update('${c.id}','contact.cell',this.value)"></div>
+      <div class="field"><label>Email(s)</label><input type="text" value="${c.contact.email}" onchange="update('${c.id}','contact.email',this.value)"></div>
+    </div>
+    <div class="subhead">Other professionals</div>
+    <div class="row">
+      <div class="field"><label>CPA / Accountant</label><input type="text" value="${c.professionals.cpa}" onchange="update('${c.id}','professionals.cpa',this.value)"></div>
+      <div class="field"><label>Estate planning attorney</label><input type="text" value="${c.professionals.attorney}" onchange="update('${c.id}','professionals.attorney',this.value)"></div>
+      <div class="field"><label>Other</label><input type="text" value="${c.professionals.other}" onchange="update('${c.id}','professionals.other',this.value)"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Financial Information</h2>
+    <div class="row">
+      <div class="field"><label>Federal tax bracket</label>
+        <select onchange="update('${c.id}','financial.taxBracket',this.value)">
+          <option value="">—</option>
+          ${['0-15%','16-28%','29-36%','36%+'].map(o=>`<option ${c.financial.taxBracket===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Estimated net worth ($)</label><input type="number" value="${c.financial.netWorth}" onchange="update('${c.id}','financial.netWorth',this.value)"></div>
+      <div class="field"><label>Liquid net worth ($)</label><input type="number" value="${c.financial.liquidNetWorth}" onchange="update('${c.id}','financial.liquidNetWorth',this.value)"></div>
+      <div class="field"><label>Estimated annual income ($)</label><input type="number" value="${c.financial.annualIncome}" onchange="update('${c.id}','financial.annualIncome',this.value)"></div>
+      <div class="field"><label>Total investment assets</label>
+        <select onchange="update('${c.id}','financial.totalAssets',this.value)">
+          <option value="">—</option>
+          ${['Under $200K','$200-500K','$500K-1 Million','$1-2 Million','Over $2 Million'].map(o=>`<option ${c.financial.totalAssets===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Overall Risk Tolerance</h2>
+    <p class="desc">Drives the client's tolerance score on the Risk Comparison tab.</p>
+    <div class="row">
+      <div class="field"><label>Risk tolerance</label>
+        <select onchange="update('${c.id}','riskTolerance',this.value)">
+          <option value="">—</option>
+          ${['Conservative','Moderately Conservative','Moderate','Moderately Aggressive','Aggressive'].map(o=>`<option ${c.riskTolerance===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Investment objective</label>
+        <select onchange="update('${c.id}','objective',this.value)">
+          <option value="">—</option>
+          ${['Safety of Principal','Tax Advantaged','Income','Growth','Speculation'].map(o=>`<option ${c.objective===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Investment horizon</label>
+        <select onchange="update('${c.id}','horizon',this.value)">
+          <option value="">—</option>
+          ${['Under 1 year','1-3 years','3-5 years','5-10 years','10-20 years','20+ years'].map(o=>`<option ${c.horizon===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Liquidity</h2>
+    <div class="row">
+      <div class="field"><label>Immediate liquidity needs</label>
+        <select onchange="update('${c.id}','liquidityImportance',this.value)">
+          <option value="">—</option>
+          ${['Very Important','Somewhat Important','Not Important'].map(o=>`<option ${c.liquidityImportance===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>
+      <div class="field"><label>Currently drawing from holdings for liquidity?</label>
+        <select onchange="update('${c.id}','drawingFromHoldings',this.value)">
+          <option value="no" ${c.drawingFromHoldings==='no'?'selected':''}>No</option>
+          <option value="yes" ${c.drawingFromHoldings==='yes'?'selected':''}>Yes</option>
+        </select></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Recommendations &amp; Notes</h2>
+    <div class="field"><label>Recommendations</label><textarea rows="2" onchange="update('${c.id}','recommendations',this.value)">${c.recommendations}</textarea></div>
+    <div class="field"><label>Notes</label><textarea rows="3" onchange="update('${c.id}','notes',this.value)">${c.notes}</textarea></div>
+  </div>
+  `;
+}
+
+// ---------- SECURITY LIBRARY VIEW ----------
+function libraryViewHTML(){
+  const rows = securityLibrary
+    .slice()
+    .sort((a,b)=>a.ticker.localeCompare(b.ticker))
+    .map((s,i)=>{
+      const realIdx = securityLibrary.indexOf(s);
+      return `<tr>
+        <td><input type="text" value="${s.ticker}" style="width:80px; text-transform:uppercase;" onchange="updateSecurity(${realIdx},'ticker',this.value)"></td>
+        <td><input type="text" value="${s.name}" onchange="updateSecurity(${realIdx},'name',this.value)"></td>
+        <td>
+          <select onchange="updateSecurity(${realIdx},'assetClass',this.value)">
+            ${ASSET_CLASSES.map(a=>`<option value="${a.key}" ${s.assetClass===a.key?'selected':''}>${a.label}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" value="${s.score}" min="0" max="100" style="width:70px;" onchange="updateSecurity(${realIdx},'score',this.value)"></td>
+        <td><button class="btn danger" onclick="removeSecurity(${realIdx})">Remove</button></td>
+      </tr>`;
+    }).join('');
+
+  return `
+    <div class="toolbar">
+      <div><h1 style="margin-bottom:2px;">Security Library</h1>
+      <p class="sub" style="margin:0;">Manual risk scores (0–100) per ticker. Enter a ticker on any holding and it pulls its score from here automatically — unmatched tickers fall back to their asset-class default.</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" onclick="addSecurity()">+ Add security</button>
+        <button class="btn secondary" onclick="exportLibrary()">Export (.json)</button>
+        <label class="btn secondary" style="cursor:pointer;">Import<input type="file" accept=".json" style="display:none;" onchange="importLibrary(event)"></label>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="note"><strong>These are starting points, not live data.</strong> Scores are set by you and don't move on their own — revisit periodically, especially after a volatility regime shift in a specific name.</div>
+      <table>
+        <thead><tr><th>Ticker</th><th>Name</th><th>Asset class (fallback)</th><th>Risk score</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function addSecurity(){
+  securityLibrary.push({ticker:'', name:'', assetClass:'largecap', score:50});
+  renderMain();
+}
+function removeSecurity(idx){
+  securityLibrary.splice(idx,1);
+  renderMain();
+}
+function updateSecurity(idx, field, val){
+  if(field==='ticker') val = val.trim().toUpperCase();
+  if(field==='score') val = Math.max(0, Math.min(100, parseFloat(val)||0));
+  securityLibrary[idx][field] = val;
+  renderMain();
+}
+function exportLibrary(){
+  const blob = new Blob([JSON.stringify(securityLibrary, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'redmount-security-library.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importLibrary(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const imported = JSON.parse(e.target.result);
+      if(Array.isArray(imported)){ securityLibrary = imported; renderMain(); }
+    }catch(err){ alert('Could not read that file.'); }
+  };
+  reader.readAsText(file);
+}
+
+// ---------- ACCOUNTS TAB ----------
+function accountsTabHTML(c){
+  const accountsHTML = c.accounts.length ? c.accounts.map(acc=>accountCardHTML(c,acc)).join('') :
+    '<div class="empty">No accounts yet.</div>';
+  return `
+  <div class="panel">
+    <div class="toolbar"><h2 style="margin:0;">Accounts &amp; Holdings</h2>
+      <button class="btn" onclick="addAccount('${c.id}')">+ Add account</button>
+    </div>
+    <p class="desc">Enter each account and its holdings by asset class and dollar value. Portfolio risk score is calculated from these across all accounts.</p>
+    ${accountsHTML}
+  </div>`;
+}
+
+function accountCardHTML(c, acc){
+  const rows = acc.holdings.map((h,i)=>{
+    const sec = findSecurity(h.ticker);
+    const score = resolveHoldingScore(h);
+    const scoreLabel = sec ? `${score} (library)` : (score!==null ? `${score} (asset-class default)` : '—');
+    return `
+    <div class="holding-row" style="grid-template-columns:0.8fr 1.4fr 1fr auto;">
+      <input type="text" placeholder="Ticker (optional)" value="${h.ticker||''}" style="text-transform:uppercase;" onchange="updateHolding('${c.id}','${acc.id}',${i},'ticker',this.value)">
+      <select onchange="updateHolding('${c.id}','${acc.id}',${i},'assetClass',this.value)">
+        ${ASSET_CLASSES.map(a=>`<option value="${a.key}" ${h.assetClass===a.key?'selected':''}>${a.label}</option>`).join('')}
+      </select>
+      <input type="number" placeholder="Value ($)" value="${h.value}" onchange="updateHolding('${c.id}','${acc.id}',${i},'value',this.value)">
+      <button class="btn danger" onclick="removeHolding('${c.id}','${acc.id}',${i})">Remove</button>
+    </div>
+    <div style="font-size:11px; color:var(--ink-dim); margin:-4px 0 8px 2px;">Risk score: ${scoreLabel}</div>`;
+  }).join('');
+  const total = acc.holdings.reduce((s,h)=>s+(parseFloat(h.value)||0),0);
+  return `
+  <div class="account-card">
+    <div class="acct-head">
+      <input type="text" value="${acc.name}" placeholder="Account name" onchange="updateAccountField('${c.id}','${acc.id}','name',this.value)">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" value="${acc.custodian}" placeholder="Custodian" style="max-width:140px;" onchange="updateAccountField('${c.id}','${acc.id}','custodian',this.value)">
+        <input type="text" value="${acc.number}" placeholder="Account #" style="max-width:130px;" onchange="updateAccountField('${c.id}','${acc.id}','number',this.value)">
+        <button class="btn danger" onclick="removeAccount('${c.id}','${acc.id}')">Remove</button>
+      </div>
+    </div>
+    ${rows || '<div class="empty" style="padding:14px;">No holdings yet.</div>'}
+    <button class="btn ghost" style="margin-top:8px;" onclick="addHolding('${c.id}','${acc.id}')">+ Add holding</button>
+    <div style="text-align:right; font-size:12.5px; color:var(--ink-dim); margin-top:8px;">Account total: $${total.toLocaleString(undefined,{maximumFractionDigits:2})}</div>
+  </div>`;
+}
+
+function addAccount(cid){
+  const c = getClient(cid);
+  c.accounts.push({id: uid('a'), name:'', custodian:'Schwab', number:'', holdings:[]});
+  renderAll();
+}
+function removeAccount(cid, aid){
+  const c = getClient(cid);
+  c.accounts = c.accounts.filter(a=>a.id!==aid);
+  renderAll();
+}
+function updateAccountField(cid, aid, field, val){
+  const c = getClient(cid);
+  const acc = c.accounts.find(a=>a.id===aid);
+  acc[field] = val;
+  renderClientList();
+}
+function addHolding(cid, aid){
+  const c = getClient(cid);
+  const acc = c.accounts.find(a=>a.id===aid);
+  acc.holdings.push({ticker:'', assetClass:'largecap', value:''});
+  renderAll();
+}
+function removeHolding(cid, aid, idx){
+  const c = getClient(cid);
+  const acc = c.accounts.find(a=>a.id===aid);
+  acc.holdings.splice(idx,1);
+  renderAll();
+}
+function updateHolding(cid, aid, idx, field, val){
+  const c = getClient(cid);
+  const acc = c.accounts.find(a=>a.id===aid);
+  acc.holdings[idx][field] = val;
+  renderClientList();
+}
+
+// ---------- RISK TAB ----------
+function riskTabHTML(c){
+  const ts = toleranceScore(c);
+  const ps = portfolioScore(c);
+  const pv = portfolioValue(c);
+
+  let gapBlock = '<div class="empty">Complete the client profile risk questions and add portfolio holdings to see the comparison.</div>';
+  if(ts!==null && ps!==null){
+    const gap = ps - ts;
+    let flagClass='aligned', flagText='Aligned within tolerance';
+    if(gap > 12){ flagClass='over'; flagText=`Portfolio is running ${gap} points hotter than stated tolerance`; }
+    else if(gap < -12){ flagClass='under'; flagText=`Portfolio is ${Math.abs(gap)} points more conservative than tolerance — possible return left on the table`; }
+    gapBlock = `
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <div class="lbl">Client tolerance score</div>
+          <div class="num">${ts}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${ts}%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="lbl">Portfolio risk score</div>
+          <div class="num">${ps}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${ps}%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="lbl">Portfolio value</div>
+          <div class="num" style="font-size:22px;">$${pv.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+          <div class="gap-flag ${flagClass}">${flagText}</div>
+        </div>
+      </div>`;
+  }
+
+  return `
+  <div class="note"><strong>Methodology:</strong> tolerance score is computed from the client's stated tolerance/objective/horizon/liquidity answers. Portfolio score is dollar-weighted across individual holdings — each ticker uses its score from the Security Library if entered, otherwise falls back to its asset-class default. This is a simple weighted average, not a correlation-adjusted portfolio model — it doesn't credit diversification, so a portfolio of uncorrelated higher-scored names will read slightly riskier here than true portfolio theory would say. Scores are Redmount-defined and manually set, not sourced from a live market feed.</div>
+  ${gapBlock}
+  `;
+}
+
+// ---------- UPDATE / IMPORT / EXPORT ----------
+function update(cid, path, value){
+  const c = getClient(cid);
+  const parts = path.split('.');
+  if(parts.length===1) c[parts[0]] = value;
+  else c[parts[0]][parts[1]] = value;
+  renderClientList();
+}
+
+function exportClients(){
+  const blob = new Blob([JSON.stringify(clients, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'redmount-risk-profiles.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importClients(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const imported = JSON.parse(e.target.result);
+      if(Array.isArray(imported)){
+        clients = imported;
+        activeId = clients.length ? clients[0].id : null;
+        renderAll();
+      }
+    }catch(err){ alert('Could not read that file.'); }
+  };
+  reader.readAsText(file);
+}
+
+renderAll();
+document.getElementById('toolSwitcher').addEventListener('change', function(){
+  if(this.value) window.location.href = this.value;
+});
+</script>
+</body>
+</html>
